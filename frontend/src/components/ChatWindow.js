@@ -1,16 +1,28 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Shield, Key, ArrowLeft, Lock } from "lucide-react";
+import {
+  Send,
+  Shield,
+  Key,
+  ArrowLeft,
+  Lock,
+  Image,
+  Paperclip,
+} from "lucide-react";
 
 const ChatWindow = ({
   session,
   messages,
   onSendMessage,
+  onSendImage,
   onEndSession,
   decryptMessage,
+  decryptImage,
 }) => {
   const [messageText, setMessageText] = useState("");
   const [decryptedMessages, setDecryptedMessages] = useState({});
+  const [decryptedImages, setDecryptedImages] = useState({});
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -20,18 +32,28 @@ const ChatWindow = ({
     scrollToBottom();
   }, [messages]);
 
-  // Decrypt messages as they arrive
+  // Decrypt messages and images as they arrive
   useEffect(() => {
-    const decryptNewMessages = async () => {
+    const decryptNewContent = async () => {
       const newDecryptions = {};
+      const newImageDecryptions = {};
 
       for (const message of messages) {
-        if (!decryptedMessages[message.id]) {
+        if (message.type === "chat" && !decryptedMessages[message.id]) {
           try {
             const decrypted = await decryptMessage(message.encryptedMessage);
             newDecryptions[message.id] = decrypted;
           } catch (err) {
             newDecryptions[message.id] = "[Decryption Failed]";
+          }
+        } else if (message.type === "image" && !decryptedImages[message.id]) {
+          try {
+            const decrypted = await decryptImage(message.encryptedImage);
+            newImageDecryptions[message.id] = decrypted;
+          } catch (err) {
+            newImageDecryptions[message.id] = {
+              error: "Failed to decrypt image",
+            };
           }
         }
       }
@@ -39,12 +61,22 @@ const ChatWindow = ({
       if (Object.keys(newDecryptions).length > 0) {
         setDecryptedMessages((prev) => ({ ...prev, ...newDecryptions }));
       }
+
+      if (Object.keys(newImageDecryptions).length > 0) {
+        setDecryptedImages((prev) => ({ ...prev, ...newImageDecryptions }));
+      }
     };
 
     if (messages.length > 0) {
-      decryptNewMessages();
+      decryptNewContent();
     }
-  }, [messages, decryptMessage, decryptedMessages]);
+  }, [
+    messages,
+    decryptMessage,
+    decryptImage,
+    decryptedMessages,
+    decryptedImages,
+  ]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -52,6 +84,39 @@ const ChatWindow = ({
       onSendMessage(messageText.trim());
       setMessageText("");
     }
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image size must be less than 5MB");
+        return;
+      }
+
+      // Check file type
+      if (!file.type.startsWith("image/")) {
+        alert("Please select an image file");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        onSendImage({
+          data: event.target.result,
+          filename: file.name,
+          type: file.type,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset file input
+    e.target.value = "";
+  };
+
+  const triggerImageUpload = () => {
+    fileInputRef.current?.click();
   };
 
   const formatTime = (timestamp) => {
@@ -135,11 +200,42 @@ const ChatWindow = ({
                   </div>
                 )}
                 <div className="break-words">
-                  {decryptedMessages[message.id] || (
-                    <div className="flex items-center space-x-2 text-gray-400">
-                      <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>
-                      <span className="text-xs">Decrypting...</span>
-                    </div>
+                  {message.type === "image" ? (
+                    // Image message
+                    decryptedImages[message.id] ? (
+                      decryptedImages[message.id].error ? (
+                        <div className="text-red-400 text-xs">
+                          {decryptedImages[message.id].error}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <img
+                            src={`data:${
+                              decryptedImages[message.id].file_type
+                            };base64,${decryptedImages[message.id].image_data}`}
+                            alt={decryptedImages[message.id].filename}
+                            className="max-w-full rounded-lg shadow-lg"
+                            style={{ maxHeight: "300px" }}
+                          />
+                          <div className="text-xs text-gray-400">
+                            📷 {decryptedImages[message.id].filename}
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex items-center space-x-2 text-gray-400">
+                        <Image className="w-4 h-4 animate-pulse" />
+                        <span className="text-xs">Decrypting image...</span>
+                      </div>
+                    )
+                  ) : (
+                    // Text message
+                    decryptedMessages[message.id] || (
+                      <div className="flex items-center space-x-2 text-gray-400">
+                        <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>
+                        <span className="text-xs">Decrypting...</span>
+                      </div>
+                    )
                   )}
                 </div>
                 <div className="text-xs text-gray-300 mt-1 opacity-70">
@@ -158,6 +254,14 @@ const ChatWindow = ({
         className="p-4 border-t border-gray-700"
       >
         <div className="flex space-x-3">
+          <button
+            type="button"
+            onClick={triggerImageUpload}
+            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            title="Send Image"
+          >
+            <Image className="w-5 h-5 text-gray-400" />
+          </button>
           <input
             type="text"
             value={messageText}
@@ -175,9 +279,21 @@ const ChatWindow = ({
             <span>Send</span>
           </button>
         </div>
+
+        {/* Hidden file input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImageUpload}
+          accept="image/*"
+          style={{ display: "none" }}
+        />
+
         <div className="flex items-center space-x-1 mt-2 text-xs text-gray-500">
           <Shield className="w-3 h-3" />
-          <span>Messages are encrypted with quantum-generated keys</span>
+          <span>
+            Messages and images are encrypted with quantum-generated keys
+          </span>
         </div>
       </form>
     </div>

@@ -154,6 +154,7 @@ const useWebSocket = (userId, displayName) => {
             ...prev,
             {
               id: Date.now() + Math.random(),
+              type: "chat",
               senderId: data.sender_id,
               senderName: data.sender_name,
               encryptedMessage: data.encrypted_message,
@@ -165,6 +166,27 @@ const useWebSocket = (userId, displayName) => {
           console.log("Session ID mismatch - not adding message");
           console.log("Expected:", currentSessionRef.current?.sessionId);
           console.log("Received:", data.session_id);
+        }
+        break;
+
+      case "image_message":
+        console.log("Image message received:", data);
+        if (data.session_id === currentSessionRef.current?.sessionId) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now() + Math.random(),
+              type: "image",
+              senderId: data.sender_id,
+              senderName: data.sender_name,
+              encryptedImage: data.encrypted_image,
+              filename: data.filename,
+              timestamp: data.timestamp,
+              isOwnMessage: data.sender_id === userId,
+            },
+          ]);
+        } else {
+          console.log("Session ID mismatch - not adding image message");
         }
         break;
 
@@ -238,6 +260,26 @@ const useWebSocket = (userId, displayName) => {
     [sendMessage]
   );
 
+  const sendImageMessage = useCallback(
+    (imageData) => {
+      const session = currentSessionRef.current;
+      if (!session) {
+        setError("No active secure session");
+        return;
+      }
+
+      console.log("Sending image message for session:", session.sessionId);
+      sendMessage({
+        type: "image_message",
+        session_id: session.sessionId,
+        image_data: imageData.data,
+        filename: imageData.filename,
+        file_type: imageData.type,
+      });
+    },
+    [sendMessage]
+  );
+
   const endSession = useCallback(() => {
     setCurrentSession(null);
     setMessages([]);
@@ -280,6 +322,40 @@ const useWebSocket = (userId, displayName) => {
     }
   };
 
+  // Decrypt image for display
+  const decryptImage = async (encryptedImage) => {
+    const session = currentSessionRef.current;
+    if (!session) return { error: "No session" };
+
+    try {
+      const response = await fetch("http://localhost:8000/api/decrypt-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          session_id: session.sessionId,
+          encrypted_message: encryptedImage,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          image_data: data.image_data,
+          filename: data.filename,
+          file_type: data.file_type,
+          size: data.size,
+        };
+      } else {
+        return { error: "Decryption Failed" };
+      }
+    } catch (err) {
+      console.error("Image decryption error:", err);
+      return { error: "Decryption Error" };
+    }
+  };
+
   // Connection management
   useEffect(() => {
     if (userId && displayName) {
@@ -318,9 +394,11 @@ const useWebSocket = (userId, displayName) => {
     acceptQKD,
     rejectQKD,
     sendChatMessage,
+    sendImageMessage,
     endSession,
     clearError,
     decryptMessage,
+    decryptImage,
   };
 };
 

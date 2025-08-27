@@ -22,9 +22,11 @@ function App() {
     acceptQKD,
     rejectQKD,
     sendChatMessage,
+    sendImageMessage,
     endSession,
     clearError,
     decryptMessage,
+    decryptImage,
   } = useWebSocket(user?.id, user?.displayName);
 
   const handleLogin = useCallback((userId, displayName) => {
@@ -119,8 +121,10 @@ function App() {
                 session={currentSession}
                 messages={messages}
                 onSendMessage={handleSendMessage}
+                onSendImage={sendImageMessage}
                 onEndSession={endSession}
                 decryptMessage={decryptMessage}
+                decryptImage={decryptImage}
               />
             ) : (
               <div className="bg-gray-800 rounded-lg quantum-border h-full flex items-center justify-center">

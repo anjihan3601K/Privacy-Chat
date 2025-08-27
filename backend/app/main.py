@@ -9,6 +9,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
     File,
+    Form,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,6 +21,8 @@ from datetime import datetime
 from typing import Dict, List, Set, Optional
 import base64
 import os
+from PIL import Image
+import io
 
 from .security.qkd import generate_session_key
 from .security.encryption import encryption_manager, create_session_key_hash
@@ -376,6 +379,95 @@ class ConnectionManager:
         print(f"Sending chat message to session {session_id}: {chat_message}")
         await self.send_to_session(chat_message, session_id)
 
+    async def send_encrypted_image(
+        self,
+        session_id: str,
+        sender_id: str,
+        image_data: str,
+        filename: str,
+        file_type: str,
+    ):
+        """Send encrypted image in a secure session"""
+        print(f"Attempting to send encrypted image in session {session_id}")
+        if session_id not in self.chat_sessions:
+            print(f"Session {session_id} not found in chat_sessions")
+            await self.send_personal_message(
+                {"type": "error", "message": "Chat session not found"}, sender_id
+            )
+            return
+
+        # Compress image if needed
+        try:
+            # Decode base64 image
+            image_bytes = base64.b64decode(
+                image_data.split(",")[1] if "," in image_data else image_data
+            )
+
+            # Compress image to reduce size
+            image = Image.open(io.BytesIO(image_bytes))
+
+            # Resize if too large (max 800px on longest side)
+            max_size = 800
+            if max(image.size) > max_size:
+                ratio = max_size / max(image.size)
+                new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+                image = image.resize(new_size, Image.Resampling.LANCZOS)
+
+            # Convert to RGB if necessary
+            if image.mode in ("RGBA", "LA"):
+                background = Image.new("RGB", image.size, (255, 255, 255))
+                background.paste(
+                    image, mask=image.split()[-1] if image.mode == "RGBA" else None
+                )
+                image = background
+
+            # Save compressed image
+            output = io.BytesIO()
+            image.save(output, format="JPEG", quality=85, optimize=True)
+            compressed_data = base64.b64encode(output.getvalue()).decode()
+
+            print(
+                f"Image compressed from {len(image_bytes)} to {len(output.getvalue())} bytes"
+            )
+
+        except Exception as e:
+            print(f"Image processing error: {e}")
+            compressed_data = image_data
+
+        # Create image message payload
+        image_payload = {
+            "data": compressed_data,
+            "filename": filename,
+            "type": file_type,
+            "size": len(compressed_data),
+        }
+
+        # Encrypt the image data
+        print(f"Encrypting image data")
+        encrypted_image = encryption_manager.encrypt_message(
+            session_id, json.dumps(image_payload)
+        )
+        print(f"Image encryption result: {encrypted_image is not None}")
+        if not encrypted_image:
+            await self.send_personal_message(
+                {"type": "error", "message": "Failed to encrypt image"}, sender_id
+            )
+            return
+
+        # Send to both users in the session
+        image_message = {
+            "type": "image_message",
+            "session_id": session_id,
+            "sender_id": sender_id,
+            "sender_name": self.users[sender_id]["display_name"],
+            "encrypted_image": encrypted_image,
+            "filename": filename,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        print(f"Sending image message to session {session_id}")
+        await self.send_to_session(image_message, session_id)
+
 
 # Global connection manager
 manager = ConnectionManager()
@@ -384,6 +476,13 @@ manager = ConnectionManager()
 class DecryptRequest(BaseModel):
     session_id: str
     encrypted_message: str
+
+
+class ImageUploadRequest(BaseModel):
+    session_id: str
+    image_data: str  # Base64 encoded image
+    filename: str
+    file_type: str
 
 
 @app.websocket("/ws/{user_id}")
@@ -429,6 +528,17 @@ async def websocket_endpoint(
                         session_id, user_id, msg_content
                     )
 
+            elif message_type == "image_message":
+                session_id = message.get("session_id")
+                image_data = message.get("image_data")
+                filename = message.get("filename", "image.jpg")
+                file_type = message.get("file_type", "image/jpeg")
+                print(f"Image message from {user_id} in session {session_id}")
+                if session_id and image_data:
+                    await manager.send_encrypted_image(
+                        session_id, user_id, image_data, filename, file_type
+                    )
+
             elif message_type == "ping":
                 await manager.send_personal_message(
                     {"type": "pong", "timestamp": datetime.now().isoformat()}, user_id
@@ -455,6 +565,29 @@ async def decrypt_message_endpoint(request: DecryptRequest):
     except Exception as e:
         print(f"Decryption error: {e}")
         return {"error": "Decryption failed"}, 500
+
+
+@app.post("/api/decrypt-image")
+async def decrypt_image_endpoint(request: DecryptRequest):
+    """Decrypt an image for display"""
+    try:
+        decrypted = encryption_manager.decrypt_message(
+            request.session_id, request.encrypted_message
+        )
+        if decrypted:
+            # Parse the decrypted JSON image payload
+            image_payload = json.loads(decrypted)
+            return {
+                "image_data": image_payload["data"],
+                "filename": image_payload["filename"],
+                "file_type": image_payload["type"],
+                "size": image_payload["size"],
+            }
+        else:
+            return {"error": "Failed to decrypt image"}, 400
+    except Exception as e:
+        print(f"Image decryption error: {e}")
+        return {"error": "Image decryption failed"}, 500
 
 
 @app.get("/")

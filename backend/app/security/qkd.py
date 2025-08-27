@@ -319,7 +319,7 @@ def generate_session_key(
         Tuple of (session_key_hex or None, eavesdropper_detected)
     """
     try:
-        bb84 = BB84Simulator(key_length=32)
+        bb84 = BB84Simulator(key_length=16)
         key, eavesdropper_detected = bb84.run_protocol(
             with_eavesdropper=simulate_eavesdropper,
             eavesdropper_rate=0.3,  # 30% interception rate

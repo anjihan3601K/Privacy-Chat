@@ -1,68 +1,223 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@import "tailwindcss";
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+/* ==============================
+   SCROLLING STYLES & COMPONENTS
+   ============================== */
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Base scroll behavior */
+.scroll-smooth {
+  scroll-behavior: smooth;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* ---- Scrollbar Styling ---- */
+
+/* Webkit Scrollbar (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-body {
-  margin: 0;
+::-webkit-scrollbar-track {
+  background: rgba(71, 85, 105, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.5);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.7);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.5) rgba(71, 85, 105, 0.3);
+}
+
+/* ---- Custom Scrollbar for User List ---- */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(51, 65, 85, 0.2);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.5);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.8);
+}
+
+/* ---- Chat Message Container ---- */
+
+/* Main scrollable container */
+.overflow-y-auto {
+  overscroll-behavior-y: contain;
+  scroll-padding-bottom: 1rem;
+  scroll-padding-top: 1rem;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* Chat message container */
+.flex-1.overflow-y-auto {
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  flex-direction: column;
+  position: relative;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    black 8px,
+    black calc(100% - 8px),
+    transparent 100%
+  );
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* ---- Message List Styling ---- */
+
+/* Chat Window scroll container */
+.flex-1.overflow-y-auto.scroll-smooth {
+  will-change: scroll-position;
+  contain: strict;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+/* User list scroll container */
+.space-y-3.flex-1.overflow-y-auto {
+  padding-right: 4px;
+  margin-right: -4px;
+  overscroll-behavior: contain;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+/* ---- Sticky Elements ---- */
+
+/* Header and Footer sticky elements */
+.sticky.top-0,
+.sticky.bottom-0 {
+  position: sticky;
+  z-index: 10;
+  background-clip: padding-box;
+}
+
+/* Header shadow effect */
+.sticky.top-0 {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Footer shadow effect */
+.sticky.bottom-0 {
+  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 -2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* ---- Message Animation & Transitions ---- */
+
+/* Smooth appearance of new messages */
+.space-y-3.sm\:space-y-4.w-full > div {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Scroll anchor */
+div[ref="messagesEndRef"] {
+  scroll-margin-bottom: 16px;
+  height: 1px;
+  width: 100%;
+  flex-shrink: 0;
+  visibility: hidden;
+}
+
+/* ---- Chat Message Container Specific Styles ---- */
+
+.chat-messages-container {
+  contain: content;
+  position: relative;
+}
+
+/* Animate new messages */
+.chat-messages-container > div {
+  transition: opacity 0.3s ease;
+  animation: message-fade-in 0.3s ease;
+}
+
+@keyframes message-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
-  a:hover {
-    color: #747bff;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+/* Message scroll anchor */
+.message-scroll-anchor {
+  height: 1px;
+  width: 100%;
+  flex-shrink: 0;
+  margin-top: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  scroll-margin-bottom: 16px;
+}
+
+/* ---- Mobile Optimizations ---- */
+
+@media (max-width: 640px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .overflow-y-auto {
+    scroll-padding-bottom: 0.75rem;
+    scroll-padding-top: 0.75rem;
+  }
+}
+
+/* ---- User List Container Styles ---- */
+
+.user-list-container {
+  scrollbar-gutter: stable;
+  padding-right: 6px;
+  transition: all 0.3s ease;
+}
+
+.user-list-container > div {
+  transition: all 0.2s ease-in-out;
+}
+
+.user-list-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+/* ---- Dark Mode Enhancements ---- */
+
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.4);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.6);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.8);
   }
 }

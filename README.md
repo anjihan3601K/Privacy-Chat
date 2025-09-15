@@ -311,3 +311,43 @@ This project is for educational purposes and demonstrates quantum cryptography c
 - [ ] Quantum digital signatures
 - [ ] Mobile application support
 - [ ] Group chat with multiparty QKD
+
+
+## QKD: Setup & Testing
+
+The project includes a dedicated walkthrough for running the BB84 QKD simulation and testing two scenarios: successful key exchange and forced eavesdropper detection. See `README_QKD.md` for the full step-by-step guide.
+
+Quick commands summary (PowerShell):
+
+1. Backend venv & deps
+
+```powershell
+cd c:\Users\User\Downloads\chat-app\chat-app\backend
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+2. Frontend deps & start
+
+```powershell
+cd c:\Users\User\Downloads\chat-app\chat-app\frontend
+npm install
+npm run dev
+```
+
+3. Successful QKD (no Eve)
+
+```powershell
+$env:QKD_EAVESDROP="false"
+python main.py
+```
+
+4. Force Eve present (QKD fails)
+
+```powershell
+$env:QKD_EAVESDROP="true"
+python main.py
+```
+
+If you prefer the longer walk-through, see `README_QKD.md` at the project root.

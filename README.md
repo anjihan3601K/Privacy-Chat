@@ -1,4 +1,6 @@
 # Quantum Chat - Multi-User Real-Time Secure Chat Application
+``` forget about chat-app in this structure
+```
 
 A demonstration of quantum-secured communication using the BB84 protocol for quantum key distribution (QKD) with real-time chat capabilities.
 
